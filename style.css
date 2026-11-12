@@ -92,13 +92,19 @@ h1{font-family:var(--f-display);font-weight:400;font-size:clamp(28px,7vw,40px);l
 .stepper{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .step{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:inherit;font-size:20px;line-height:1;cursor:pointer}
 .step:active{background:var(--accent-soft)}
-.stepper input{width:64px;text-align:center;font-family:var(--f-mono);font-size:18px;font-variant-numeric:tabular-nums;cursor:default}
+.stepper input{width:72px;text-align:center;font-family:var(--f-mono);font-size:18px;font-variant-numeric:tabular-nums;cursor:default}
 .unit{font-size:14px;color:var(--muted)}
 .clear{font:inherit;font-size:12px;color:var(--muted);background:none;border:0;text-decoration:underline;cursor:pointer;padding:4px}
 
+/* ＋−ボタンは長押しで連続入力。長押しメニューや文字選択を出さない */
+.step{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;touch-action:manipulation}
+.num-input{cursor:text}
+
 /* 時間の選択 */
 .duration{display:flex;flex-direction:column;gap:6px;max-width:420px}
-.dur-out{font-family:var(--f-mono);font-size:22px;font-variant-numeric:tabular-nums;color:var(--muted)}
+.dur-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dur-num{width:72px;text-align:center;font-family:var(--f-mono);font-size:18px;font-variant-numeric:tabular-nums}
+.dur-out{font-family:var(--f-mono);font-size:18px;font-variant-numeric:tabular-nums;color:var(--muted)}
 .duration.set .dur-out{color:var(--accent);font-weight:500}
 .dur-row{display:grid;grid-template-columns:42px minmax(0,1fr) 42px;gap:10px;align-items:center}
 .dur-row input[type=range]{width:100%;accent-color:var(--accent);height:28px;margin:0}
