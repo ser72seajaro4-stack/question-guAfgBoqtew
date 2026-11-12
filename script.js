@@ -18,6 +18,8 @@ const ROOMS = {
 const DAYS  = ["月","火","水","木","金","土","日","祝日"];
 const BANDS = ["9〜12時","12〜15時","15〜18時","18〜21時","21〜24時","24〜5時"];
 const SCALE = ["いつも","ときどき","あまり","知らなかった"];
+// 全角数字を半角にし、数字以外を取り除く
+const toHalf = s => String(s).replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/[^0-9]/g, "");
 function fmtMin(m){
   m = +m;
   const h = Math.floor(m / 60), r = m % 60;
@@ -48,7 +50,7 @@ const SECTIONS = [
     {no:"1-4", t:"当日入店の方に、機種・モニターの希望を聞いていますか。",
       parts:[
         {id:"q1_4", label:"聞いているか", type:"radio", other:true, opts:["いつも聞く","空室が多いときだけ聞く","聞かない（言われたら対応）","その他"]},
-        {id:"q1_4b", label:"「空室が多い」の目安", type:"stepper", min:1, max:30, unit:"室以上", showIf:{id:"q1_4", eq:"空室が多いときだけ聞く"}},
+        {id:"q1_4b", label:"「空室が多い」の目安（全部屋に対する空室の割合）", type:"stepper", min:5, max:100, step:5, unit:"%以上", showIf:{id:"q1_4", eq:"空室が多いときだけ聞く"}},
       ]},
     {no:"1-5", t:"「短時間はキッチンの近く、長時間は遠く」のルールをどれくらい意識していますか。",
       parts:[{id:"q1_5", type:"radio", opts:SCALE}]},
@@ -233,16 +235,20 @@ function renderField(p, id){
       return h + `</div>`;
     }
     case "stepper":
-      return `<div class="stepper" data-min="${p.min}" data-max="${p.max}">
+      return `<div class="stepper" data-min="${p.min}" data-max="${p.max}" data-stepsize="${p.step || 1}">
         <button type="button" class="step" data-step="-1" data-for="${id}" aria-label="減らす">−</button>
-        <input type="text" id="${id}" readonly inputmode="none" placeholder="—" aria-label="${esc(p.label || "数")}">
+        <input type="text" id="${id}" class="num-input" inputmode="numeric" autocomplete="off" placeholder="—" aria-label="${esc(p.label || "数")}（数字で入力もできます）">
         <button type="button" class="step" data-step="1" data-for="${id}" aria-label="増やす">＋</button>
         <span class="unit">${esc(p.unit)}</span>
         <button type="button" class="clear" data-clear="${id}">クリア</button>
       </div>`;
     case "duration":
       return `<div class="duration" data-dur="${id}" data-zero="${esc(p.zero || "")}" data-suffix="${esc(p.suffix || "")}">
-        <output class="dur-out" id="${id}_out">未選択</output>
+        <div class="dur-head">
+          <input type="text" id="${id}_num" class="num-input dur-num" inputmode="numeric" autocomplete="off" placeholder="—" aria-label="${esc(p.label || "時間")}（分を数字で入力もできます）">
+          <span class="unit">分</span>
+          <output class="dur-out" id="${id}_out">未選択</output>
+        </div>
         <div class="dur-row">
           <button type="button" class="step" data-dstep="-1" data-for="${id}" aria-label="短くする">−</button>
           <input type="range" id="${id}_range" min="${p.min}" max="${p.max}" step="${p.step}" value="${p.start ?? p.min}" aria-label="${esc(p.label || "時間")}">
@@ -341,7 +347,7 @@ function fieldValue(p, id){
     }
     case "rooms": return checkedVals(id).join("、");
     case "stepper": {
-      const v = document.getElementById(id).value;
+      const v = toHalf(document.getElementById(id).value);
       return v === "" ? "" : v + p.unit;
     }
     case "duration": return durText(id);
@@ -362,6 +368,8 @@ function refreshDurations(){
     const out = document.getElementById(id + "_out");
     out.textContent = t || "未選択";
     box.classList.toggle("set", !!t);
+    const num = document.getElementById(id + "_num");
+    if (num && document.activeElement !== num) num.value = document.getElementById(id).value;
   });
 }
 
@@ -570,18 +578,25 @@ form.addEventListener("change", e => {
 });
 form.addEventListener("input", e => {
   if (e.target.type === "range") document.getElementById(e.target.id.replace(/_range$/, "")).value = e.target.value;
+  if (e.target.classList.contains("dur-num")){
+    const id = e.target.id.replace(/_num$/, "");
+    const r = document.getElementById(id + "_range"), raw = toHalf(e.target.value);
+    if (raw !== "" && +raw >= +r.min && +raw <= +r.max){ r.value = raw; document.getElementById(id).value = raw; }
+    if (raw === "") document.getElementById(id).value = "";
+  }
   refreshUI(); saveDraft();
 });
 
-form.addEventListener("click", e => {
-  const b = e.target.closest("button");
-  if (!b) return;
+// ---------- ＋−ボタン（タップで1つ、長押しで連続） ----------
+
+function doStep(b){
   if (b.dataset.step){
     const input = document.getElementById(b.dataset.for);
     const box = b.closest(".stepper");
-    const min = +box.dataset.min, max = +box.dataset.max;
-    const cur = input.value === "" ? null : +input.value;
-    let next = cur === null ? (b.dataset.step > 0 ? min : null) : cur + +b.dataset.step;
+    const min = +box.dataset.min, max = +box.dataset.max, size = +box.dataset.stepsize || 1;
+    const raw = toHalf(input.value);
+    const cur = raw === "" ? null : +raw;
+    let next = cur === null ? (b.dataset.step > 0 ? min : null) : cur + b.dataset.step * size;
     if (next !== null && next < min) next = null;
     if (next !== null && next > max) next = max;
     input.value = next === null ? "" : next;
@@ -590,6 +605,66 @@ form.addEventListener("click", e => {
     const h = document.getElementById(b.dataset.for);
     if (h.value !== "") r.value = +r.value + +b.dataset.dstep * +r.step;
     h.value = r.value;
+  }
+  refreshUI();
+}
+
+let holdTimer = null;
+function stopHold(){
+  if (holdTimer === null) return;
+  clearTimeout(holdTimer); holdTimer = null;
+  saveDraft();
+}
+form.addEventListener("pointerdown", e => {
+  const b = e.target.closest(".step");
+  if (!b || e.button > 0) return;
+  e.preventDefault();
+  stopHold();
+  doStep(b);
+  let n = 0;
+  const repeat = () => { doStep(b); n++; holdTimer = setTimeout(repeat, n > 12 ? 40 : 90); };
+  holdTimer = setTimeout(repeat, 400);   // 0.4秒押し続けると連続で増減
+});
+["pointerup","pointercancel","pointerleave"].forEach(t => form.addEventListener(t, e => {
+  if (t !== "pointerleave" || (e.target.closest && e.target.closest(".step"))) stopHold();
+}, true));
+window.addEventListener("blur", stopHold);
+form.addEventListener("contextmenu", e => { if (e.target.closest(".step")) e.preventDefault(); });
+
+// 手入力した数字を範囲内に整える
+function commitNumber(el){
+  if (el.classList.contains("dur-num")){
+    const id = el.id.replace(/_num$/, "");
+    const r = document.getElementById(id + "_range"), h = document.getElementById(id);
+    const raw = toHalf(el.value);
+    if (raw === ""){ h.value = ""; }
+    else {
+      const v = Math.min(+r.max, Math.max(+r.min, +raw));
+      r.value = v; h.value = v;
+    }
+    el.value = h.value;
+  } else if (el.closest(".stepper")){
+    const box = el.closest(".stepper");
+    const raw = toHalf(el.value);
+    el.value = raw === "" ? "" : Math.min(+box.dataset.max, Math.max(+box.dataset.min, +raw));
+  }
+}
+form.addEventListener("focusout", e => {
+  if (e.target.classList && e.target.classList.contains("num-input")){ commitNumber(e.target); refreshUI(); saveDraft(); }
+});
+form.addEventListener("keydown", e => {
+  if (e.key === "Enter" && e.target.classList && e.target.classList.contains("num-input")){
+    e.preventDefault(); commitNumber(e.target); refreshUI(); saveDraft(); e.target.blur();
+  }
+});
+
+form.addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.step || b.dataset.dstep){
+    // マウス・タッチは pointerdown で処理済み。キーボード操作（Enter/Space）のときだけここで動かす
+    if (e.detail === 0) { doStep(b); saveDraft(); }
+    return;
   } else if (b.dataset.dclear){
     document.getElementById(b.dataset.dclear).value = "";
   } else if (b.dataset.clear){
