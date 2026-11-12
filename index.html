@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>フロント業務アンケート</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">FRONT DESK SURVEY · 本店／駅前店</div>
+    <h1>フロント業務アンケート</h1>
+    <p class="lead">マニュアルに書きにくい「現場の判断の目安」を集めています。ほとんどの質問はタップだけで答えられます。分からない質問は飛ばして大丈夫です（所要 5分ほど）。</p>
+  </header>
+
+  <div class="progress" id="progress" aria-live="off">
+    <div class="progress-track"><div class="progress-bar" id="progressBar"></div></div>
+    <span class="progress-text">回答済み <span id="progressText">0 問</span></span>
+  </div>
+
+  <form id="survey" novalidate action="javascript:void(0)" onsubmit="return false">
+    <div id="questions"></div>
+    <!-- スパム対策（人には見えない欄。入力があれば送信しない） -->
+    <input type="text" name="_honey" id="honey" class="honey" tabindex="-1" autocomplete="off" aria-hidden="true">
+    <div class="actions">
+      <p class="err" id="err" hidden></p>
+      <button type="button" class="btn" id="submitBtn">回答を送信する</button>
+    </div>
+  </form>
+
+  <section id="done" class="sheet" hidden aria-live="polite">
+    <div class="tab">✓</div>
+    <div class="sheet-body">
+      <h2>回答を送信しました</h2>
+      <p>ご協力ありがとうございました。このページは閉じて大丈夫です。</p>
+    </div>
+  </section>
+
+  <section id="failed" class="sheet" hidden aria-live="polite">
+    <div class="tab">!</div>
+    <div class="sheet-body">
+      <h2>送信できませんでした</h2>
+      <p id="failMsg" class="note-plain"></p>
+      <p class="note-plain">お手数ですが、下の回答をコピーしてメールで送ってください。</p>
+      <div class="addr">
+        <code id="addr"></code>
+        <button type="button" class="mini" id="copyAddr">アドレスをコピー</button>
+      </div>
+      <textarea id="out" readonly aria-label="回答内容"></textarea>
+      <p class="toast" id="toast"></p>
+      <div class="actions">
+        <button type="button" class="btn" id="copyOut">回答をコピー</button>
+        <button type="button" class="btn ghost" id="retryBtn">もう一度送信する</button>
+      </div>
+    </div>
+  </section>
+</div>
+<script src="script.js"></script>
+</body>
+</html>
