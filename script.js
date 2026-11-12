@@ -114,7 +114,7 @@ const SECTIONS = [
     {no:"2-7", t:"「混雑時なので延長不可」と判断する目安は何ですか。",
       parts:[
         {id:"q2_5a", label:"待っている組数", type:"stepper", min:1, max:10, unit:"組以上"},
-        {id:"q2_5b", label:"空室の数", type:"stepper", min:0, max:10, unit:"室以下"},
+        {id:"q2_5b", label:"空室の数（全部屋に対する空室の割合）", type:"stepper", min:0, max:100, step:5, unit:"%以下"},
         {id:"q2_5c", label:"ほかの判断材料", type:"check", other:true, opts:[
           "予約が詰まっている","人手が足りない","清掃が追いついていない","その他"]},
       ]},
