@@ -97,8 +97,78 @@ button:disabled{opacity:.6;cursor:wait}
       .then(decrypt).then(show)
       .catch(function () { try { sessionStorage.removeItem(KEY_NAME); } catch (e) {} });
   }
+  /* ---- 入力ミスの制限 ----
+     5回続けて間違えると、5回目から1時間は入力できない。
+     最後に間違えてから1時間たつと回数はリセットされる。
+     時刻は端末の時計（Date.now）で計るので、ページを閉じていても時間は進む。
+     回数はこの端末のブラウザ（localStorage）に保存し、ページを離れても残る。 */
+  var LIMIT = 5, LOCK_MS = 60 * 60 * 1000;
+  var LOCK_NAME = "page-gate-lock:" + location.pathname;
+  var mem = { count: 0, last: 0, until: 0 };
+  function now() { return Date.now(); }
+  function load() {
+    var s = mem;
+    try {
+      var raw = localStorage.getItem(LOCK_NAME);
+      if (raw) {
+        var p = JSON.parse(raw);
+        s = { count: +p.count || 0, last: +p.last || 0, until: +p.until || 0 };
+      }
+    } catch (e) {}
+    var t = now();
+    if ((s.until && t >= s.until) ||                        /* 制限が終わった */
+        (!s.until && s.last && t - s.last >= LOCK_MS)) {    /* 最後に間違えてから1時間たった */
+      s = { count: 0, last: 0, until: 0 };
+      save(s);
+    }
+    mem = s;
+    return s;
+  }
+  function save(s) {
+    mem = s;
+    try {
+      if (s.count) localStorage.setItem(LOCK_NAME, JSON.stringify(s));
+      else localStorage.removeItem(LOCK_NAME);
+    } catch (e) {}
+  }
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  var timer = null;
+  function renderLock() {
+    var s = load();
+    if (s.until && now() < s.until) {
+      var d = new Date(s.until), left = Math.ceil((s.until - now()) / 60000);
+      pw.disabled = true; go.disabled = true; pw.value = "";
+      msg.className = "err";
+      msg.textContent = "パスワードを" + LIMIT + "回続けて間違えたため、" + pad(d.getHours()) + ":" + pad(d.getMinutes()) +
+        " まで入力できません（あと約" + left + "分）。";
+      if (!timer) timer = setInterval(renderLock, 15000);
+      return true;
+    }
+    if (timer) {
+      clearInterval(timer); timer = null;
+      pw.disabled = false; go.disabled = false;
+      msg.className = ""; msg.textContent = "もう一度入力できます。";
+    }
+    return false;
+  }
+  function failed() {
+    var s = load(), t = now();
+    s.count += 1; s.last = t;
+    if (s.count >= LIMIT) s.until = t + LOCK_MS;
+    save(s);
+    if (renderLock()) return;
+    msg.className = "err";
+    msg.textContent = "パスワードが違います。あと" + (LIMIT - s.count) + "回間違えると、1時間入力できなくなります。";
+    go.disabled = false; pw.select();
+  }
+  renderLock();
+  /* 別のタブで制限がかかったときも、このタブに反映する */
+  window.addEventListener("storage", function (e) { if (e.key === LOCK_NAME) renderLock(); });
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) renderLock(); });
+
   form.addEventListener("submit", function (e) {
     e.preventDefault();
+    if (renderLock()) return;
     go.disabled = true; msg.className = ""; msg.textContent = "確認しています…";
     var key;
     crypto.subtle.importKey("raw", new TextEncoder().encode(pw.value), "PBKDF2", false, ["deriveKey"])
@@ -110,13 +180,11 @@ button:disabled{opacity:.6;cursor:wait}
       .then(function (html) {
         return crypto.subtle.exportKey("raw", key).then(function (raw) {
           try { sessionStorage.setItem(KEY_NAME, b64(new Uint8Array(raw))); } catch (e) {}
+          save({ count: 0, last: 0, until: 0 }); /* 正しく開けたら回数をリセット */
           show(html);
         });
       })
-      .catch(function () {
-        msg.textContent = "パスワードが違います。もう一度入力してください。";
-        msg.className = "err"; go.disabled = false; pw.select();
-      });
+      .catch(failed);
   });
 })();
 </script>
